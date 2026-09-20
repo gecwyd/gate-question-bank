@@ -5,7 +5,7 @@ import MdPreview from "@/components/MdPreview";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Loader2, PanelLeft, RotateCcw, X } from "lucide-react";
+import { Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Filter, Loader2, PanelLeft, RotateCcw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Entry = { name: string; type: "file" | "dir"; path: string };
@@ -142,6 +142,7 @@ export default function Home() {
   const [revealed, setRevealed] = useState<Set<number>>(new Set());
   const [mobileListOpen, setMobileListOpen] = useState(false);
   const [changePaperOpen, setChangePaperOpen] = useState(false);
+  const [topic, setTopic] = useState("All topics");
 
   async function list(path = "") {
     const res = await fetch(`${API}/${path}`, { headers: { Accept: "application/vnd.github+json" } });
@@ -171,7 +172,7 @@ export default function Home() {
   }
 
   async function choosePaper(v: string) {
-    setPaper(v); setLoadingPaper(true); setError(""); setActiveIndex(0); setSidebarPage(1); setRevealed(new Set()); setChangePaperOpen(false);
+    setPaper(v); setLoadingPaper(true); setError(""); setActiveIndex(0); setSidebarPage(1); setRevealed(new Set()); setChangePaperOpen(false); setTopic("All topics");
     try {
       const res = await fetch(`${RAW}/${year}/${branch}/${v}/final_questions.json`);
       if (!res.ok) throw new Error();
@@ -182,13 +183,16 @@ export default function Home() {
 
   function reset() {
     setYear(""); setBranch(""); setPaper(""); setQuestions([]); setBranches([]); setPapers([]);
-    setActiveIndex(0); setSidebarPage(1); setRevealed(new Set()); setError("");
+    setActiveIndex(0); setSidebarPage(1); setRevealed(new Set()); setError(""); setTopic("All topics");
   }
 
-  const totalPages = Math.max(1, Math.ceil(questions.length / SIDEBAR_PAGE));
-  const sidebarItems = questions.slice((sidebarPage - 1) * SIDEBAR_PAGE, sidebarPage * SIDEBAR_PAGE);
+  const topics = useMemo(() => ["All topics", ...Array.from(new Set(questions.map(q => q.topic_name).filter(Boolean) as string[])).sort()], [questions]);
+  const filtered = useMemo(() => topic === "All topics" ? questions : questions.filter(q => q.topic_name === topic), [questions, topic]);
 
-  const activeQuestion = questions[activeIndex];
+  const totalPages = Math.max(1, Math.ceil(filtered.length / SIDEBAR_PAGE));
+  const sidebarItems = filtered.slice((sidebarPage - 1) * SIDEBAR_PAGE, sidebarPage * SIDEBAR_PAGE);
+
+  const activeQuestion = filtered[activeIndex];
 
   if (!questions.length && !loadingPaper) {
     return (
@@ -343,11 +347,32 @@ export default function Home() {
           "lg:static lg:inset-y-auto lg:z-auto lg:w-[280px] lg:shrink-0 lg:translate-x-0",
           mobileListOpen ? "translate-x-0" : "-translate-x-full"
         )}>
-          <div className="flex items-center justify-between px-4 py-3 lg:py-3">
-            <h2 className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400">Questions</h2>
-            <button onClick={() => setMobileListOpen(false)} className="flex h-6 w-6 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100 lg:hidden dark:hover:bg-neutral-800">
-              <X className="h-3.5 w-3.5" />
-            </button>
+          <div className="flex flex-col border-b border-neutral-200/60 dark:border-neutral-800">
+            <div className="flex items-center justify-between px-4 py-3 lg:py-3">
+              <h2 className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400">Questions</h2>
+              <button onClick={() => setMobileListOpen(false)} className="flex h-6 w-6 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100 lg:hidden dark:hover:bg-neutral-800">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="px-4 pb-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger className={cn(buttonVariants({ variant: "outline" }), "h-8 w-full justify-between rounded-md border-neutral-200 bg-neutral-50 px-2.5 text-xs shadow-none hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800/50 dark:hover:bg-neutral-800")}>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Filter className="h-3 w-3 shrink-0 text-neutral-400" />
+                    <span className="truncate text-neutral-600 dark:text-neutral-300">{topic === "All topics" ? "All topics" : topic}</span>
+                  </div>
+                  <ChevronDown className="h-3 w-3 shrink-0 text-neutral-400" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="max-h-64 w-[250px] overflow-y-auto rounded-lg p-1">
+                  {topics.map(t => (
+                    <DropdownMenuItem key={t} onClick={() => { setTopic(t); setSidebarPage(1); setActiveIndex(0); }} className="cursor-pointer rounded-md px-3 py-2 text-sm">
+                      <span className="truncate">{t}</span>
+                      {topic === t && <CheckCircle2 className="ml-auto h-3.5 w-3.5 text-blue-500" />}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto px-2 pb-3">
             {questionListContent}
@@ -361,7 +386,7 @@ export default function Home() {
               className="mb-4 flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-600 lg:hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
             >
               <PanelLeft className="h-4 w-4" />
-              Q{activeIndex + 1} of {questions.length}
+              Q{activeIndex + 1} of {filtered.length}
             </button>
 
             {activeQuestion ? (
@@ -375,10 +400,10 @@ export default function Home() {
                     <ChevronLeft className="h-3.5 w-3.5" /> Prev
                   </button>
                   <span className="text-xs font-medium text-neutral-400">
-                    Question <span className="font-semibold text-neutral-700 dark:text-neutral-200">{activeIndex + 1}</span> of {questions.length}
+                    Question <span className="font-semibold text-neutral-700 dark:text-neutral-200">{activeIndex + 1}</span> of {filtered.length}
                   </span>
                   <button
-                    disabled={activeIndex === questions.length - 1}
+                    disabled={activeIndex === filtered.length - 1}
                     onClick={() => { const next = activeIndex + 1; setActiveIndex(next); setSidebarPage(Math.floor(next / SIDEBAR_PAGE) + 1); }}
                     className="flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 disabled:opacity-30 dark:hover:bg-neutral-800"
                   >

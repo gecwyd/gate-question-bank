@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Inter } from "next/font/google";
 import { ExternalLink } from "lucide-react";
+import Image from "next/image";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import unionLogo from "../../public/union-logo.webp";
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -22,7 +24,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <div className="flex h-14 items-center justify-between px-5">
             <div className="flex items-center gap-2.5">
               <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-neutral-200 bg-white dark:border-neutral-700">
-                <img src="/union-logo.webp" alt="Logo" className="h-full w-full object-contain p-0.5" />
+                <Image src={unionLogo} alt="Logo" className="h-full w-full object-contain p-0.5" priority />
               </div>
               <h1 className="text-sm font-semibold text-neutral-900 dark:text-white">GATE Question Bank</h1>
               <span className="hidden text-[10px] font-medium text-neutral-400 sm:inline">Sathva College Union</span>
