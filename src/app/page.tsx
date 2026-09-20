@@ -381,6 +381,26 @@ export default function Home() {
 
         <main className="flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-8 sm:py-8">
+            <div className="mb-4 lg:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger className={cn(buttonVariants({ variant: "outline" }), "h-9 w-full justify-between rounded-xl border-neutral-200/60 bg-white px-3 text-xs shadow-sm hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900/50 dark:hover:bg-neutral-800")}>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Filter className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+                    <span className="truncate font-medium text-neutral-600 dark:text-neutral-300">{topic === "All topics" ? "All topics" : topic}</span>
+                  </div>
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="max-h-64 w-[calc(100vw-2rem)] overflow-y-auto rounded-lg p-1 sm:w-[400px]">
+                  {topics.map(t => (
+                    <DropdownMenuItem key={t} onClick={() => { setTopic(t); setSidebarPage(1); setActiveIndex(0); }} className="cursor-pointer rounded-md px-3 py-2 text-sm">
+                      <span className="truncate">{t}</span>
+                      {topic === t && <CheckCircle2 className="ml-auto h-3.5 w-3.5 text-blue-500" />}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
             {activeQuestion ? (
               <div>
                 <div className="mb-6 flex items-center justify-between rounded-xl border border-neutral-200/60 bg-white p-1.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/50">
