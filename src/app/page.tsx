@@ -28,7 +28,8 @@ function markdownText(value = "") {
     .replace(/\n{3,}/g, "\n\n");
 }
 
-function remoteImage(url: string) {
+function remoteImage(url: unknown) {
+  if (typeof url !== "string") return null;
   if (url.startsWith("http")) return url;
   return `${RAW}/${url.replace(/^\.\//, "")}`;
 }
@@ -126,7 +127,8 @@ export default function Home() {
       <div className="questions">{shown.map((q, index) => {
         const absoluteIndex = (page - 1) * PAGE_SIZE + index;
         const answerOpen = revealed.has(absoluteIndex);
-        return <article className="question" key={`${q.question_number}-${absoluteIndex}`}><div className="question-meta"><span className="number">{q.question_number ?? `Q.${absoluteIndex + 1}`}</span><span>{q.topic_name ?? "GATE"}</span><span>{q.marks ?? 1} mark{q.marks === 1 ? "" : "s"}{q.negativeMarks ? ` · −${q.negativeMarks}` : ""}</span></div><div className="question-body"><p className="prompt">{markdownText(q.question)}</p>{(q.images ?? []).map((image, imageIndex) => <img className="question-image" key={imageIndex} src={remoteImage(image)} alt={`Diagram for ${q.question_number}`} />)}<div className="choices">{(q.choices ?? []).map((choice, choiceIndex) => <div className="choice" key={choiceIndex}><span>{String.fromCharCode(65 + choiceIndex)}</span><p>{markdownText(choice)}</p></div>)}</div><button className="answer-button" onClick={() => setRevealed(old => { const next = new Set(old); answerOpen ? next.delete(absoluteIndex) : next.add(absoluteIndex); return next; })}>{answerOpen ? "Hide answer" : "Reveal answer"}<b>→</b></button>{answerOpen && <aside className="answer"><strong>Answer</strong><p>{(q.answers ?? []).join(", ") || "Not specified"}</p>{q.explanation && <details><summary>Read explanation</summary><p>{markdownText(q.explanation)}</p></details>}</aside>}</div></article>;
+        const images = (q.images ?? []).map(remoteImage).filter((image): image is string => Boolean(image));
+        return <article className="question" key={`${q.question_number}-${absoluteIndex}`}><div className="question-meta"><span className="number">{q.question_number ?? `Q.${absoluteIndex + 1}`}</span><span>{q.topic_name ?? "GATE"}</span><span>{q.marks ?? 1} mark{q.marks === 1 ? "" : "s"}{q.negativeMarks ? ` · −${q.negativeMarks}` : ""}</span></div><div className="question-body"><p className="prompt">{markdownText(q.question)}</p>{images.map((image, imageIndex) => <img className="question-image" key={imageIndex} src={image} alt={`Diagram for ${q.question_number}`} />)}<div className="choices">{(q.choices ?? []).map((choice, choiceIndex) => <div className="choice" key={choiceIndex}><span>{String.fromCharCode(65 + choiceIndex)}</span><p>{markdownText(choice)}</p></div>)}</div><button className="answer-button" onClick={() => setRevealed(old => { const next = new Set(old); answerOpen ? next.delete(absoluteIndex) : next.add(absoluteIndex); return next; })}>{answerOpen ? "Hide answer" : "Reveal answer"}<b>→</b></button>{answerOpen && <aside className="answer"><strong>Answer</strong><p>{(q.answers ?? []).join(", ") || "Not specified"}</p>{q.explanation && <details><summary>Read explanation</summary><p>{markdownText(q.explanation)}</p></details>}</aside>}</div></article>;
       })}</div>
       {!shown.length && <div className="no-results">No questions match those filters.</div>}
       <nav className="pagination" aria-label="Question pages"><button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>← Previous</button><span>Page <b>{page}</b> of {pageCount}</span><button onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page === pageCount}>Next →</button></nav>
