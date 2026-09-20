@@ -1,37 +1,129 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import MdPreview from "@/components/MdPreview";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Eye, EyeOff, Loader2, PanelLeft, RotateCcw, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type Entry = { name: string; type: "file" | "dir"; path: string };
-type Question = {
-  question_number?: string; question?: string; type?: string; choices?: string[];
-  marks?: number; negativeMarks?: number; subject_name?: string; topic_name?: string;
-  answers?: string[]; explanation?: string; images?: string[];
-};
+type Question = { question_number?: string; question?: string; type?: string; choices?: string[]; marks?: number; negativeMarks?: number; subject_name?: string; topic_name?: string; answers?: string[]; explanation?: string; images?: string[] };
 
-const SOURCE = "gecwyd/gate-questions";
-const API = `https://api.github.com/repos/${SOURCE}/contents`;
-const RAW = `https://raw.githubusercontent.com/${SOURCE}/main`;
-const PAGE_SIZE = 10;
+const API = "https://api.github.com/repos/gecwyd/gate-questions/contents";
+const RAW = "https://raw.githubusercontent.com/gecwyd/gate-questions/main";
+const SIDEBAR_PAGE = 10;
 
 function readable(code: string) {
-  const names: Record<string, string> = { ce: "Civil Engineering", cs: "Computer Science", ee: "Electrical Engineering", ec: "Electronics & Communication", me: "Mechanical Engineering", da: "Data Science & AI", xe: "Engineering Sciences", ch: "Chemical Engineering", ar: "Architecture", ag: "Agricultural Engineering", bm: "Biomedical Engineering", cy: "Chemistry", ey: "Ecology & Evolution", es: "Environmental Science", ge: "Geology & Geophysics", in: "Instrumentation Engineering", ma: "Mathematics", mt: "Metallurgical Engineering", mn: "Mining Engineering", pe: "Petroleum Engineering", ph: "Physics", st: "Statistics", tf: "Textile Engineering", xh: "Humanities & Social Sciences", ae: "Aerospace Engineering" };
+  const names: Record<string, string> = { ae: "Aerospace Engineering", ag: "Agricultural Engineering", ar: "Architecture", bm: "Biomedical Engineering", ce: "Civil Engineering", ch: "Chemical Engineering", cs: "Computer Science", cy: "Chemistry", da: "Data Science & AI", ec: "Electronics & Communication", ee: "Electrical Engineering", es: "Environmental Science", ey: "Ecology & Evolution", ge: "Geology & Geophysics", in: "Instrumentation Engineering", ma: "Mathematics", me: "Mechanical Engineering", mn: "Mining Engineering", mt: "Metallurgical Engineering", pe: "Petroleum Engineering", ph: "Physics", st: "Statistics", tf: "Textile Engineering", xe: "Engineering Sciences", xh: "Humanities & Social Sciences" };
   return names[code.toLowerCase()] ?? code.toUpperCase();
-}
-
-function markdownText(value = "") {
-  return value
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
-    .replace(/\$\$([\s\S]*?)\$\$/g, "$1")
-    .replace(/\$([^$]+)\$/g, "$1")
-    .replace(/[*#>`_]/g, "")
-    .replace(/\n{3,}/g, "\n\n");
 }
 
 function remoteImage(url: unknown) {
   if (typeof url !== "string") return null;
-  if (url.startsWith("http")) return url;
-  return `${RAW}/${url.replace(/^\.\//, "")}`;
+  return url.startsWith("http") ? url : `${RAW}/${url.replace(/^\.\//, "")}`;
+}
+
+function Picker({ label, value, placeholder, items, disabled, onSelect, display = (v: string) => v }: { label: string; value: string; placeholder: string; items: Entry[]; disabled?: boolean; onSelect: (v: string) => void; display?: (v: string) => string }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-widest text-neutral-400">{label}</label>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          disabled={disabled}
+          className={cn(
+            buttonVariants({ variant: "outline" }),
+            "h-11 w-full justify-between rounded-lg border-neutral-200 bg-white px-3.5 text-left text-sm font-medium shadow-none dark:border-neutral-700 dark:bg-neutral-800",
+            !value && "text-neutral-400",
+            disabled && "cursor-not-allowed opacity-40"
+          )}
+        >
+          <span className="truncate">{value ? display(value) : placeholder}</span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="max-h-64 min-w-[240px] overflow-y-auto rounded-lg p-1">
+          {items.map((item) => (
+            <DropdownMenuItem key={item.path} onClick={() => onSelect(item.name)} className="cursor-pointer rounded-md px-3 py-2 text-sm">
+              {display(item.name)}
+              {value === item.name && <CheckCircle2 className="ml-auto h-3.5 w-3.5 text-blue-500" />}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
+function QuestionDetail({ q, index, answerOpen, onToggleAnswer }: { q: Question; index: number; answerOpen: boolean; onToggleAnswer: () => void }) {
+  const images = (q.images ?? []).map(remoteImage).filter((img): img is string => Boolean(img));
+
+  return (
+    <Collapsible open={answerOpen} onOpenChange={onToggleAnswer}>
+      <div className="question-meta mb-5">
+        {q.topic_name && <span className="meta-tag meta-tag-accent">{q.topic_name}</span>}
+        {q.type && <span className="meta-tag">{q.type}</span>}
+        <span className="meta-tag">{q.marks ?? 1}M</span>
+      </div>
+
+      <div className="flex gap-4">
+        <span className="question-number">{q.question_number ?? `Q${index}`}.</span>
+        <div className="question-body min-w-0 flex-1">
+          <MdPreview value={q.question ?? ""} />
+        </div>
+      </div>
+
+      {!!images.length && (
+        <div className="mt-6 ml-10 space-y-3">
+          {images.map((src, i) => (
+            <img key={i} src={src} alt={`Q${index} diagram`} className="h-auto max-w-full rounded-lg border border-neutral-200 dark:border-neutral-700" />
+          ))}
+        </div>
+      )}
+
+      {!!q.choices?.length && (
+        <div className="mt-6 ml-6 space-y-1">
+          {q.choices.map((choice, i) => (
+            <div key={i} className="choice-item">
+              <span className="choice-label">{String.fromCharCode(65 + i)}</span>
+              <div className="choice-text min-w-0 flex-1">
+                <MdPreview value={choice} minimal />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-8">
+        <CollapsibleTrigger className="reveal-trigger">
+          {answerOpen ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+          {answerOpen ? "Hide Solution" : "Reveal Solution"}
+        </CollapsibleTrigger>
+      </div>
+
+      <CollapsibleContent>
+        <div className="solution-panel mt-6 rounded-xl">
+          <div className="flex items-start gap-3">
+            <span className="solution-badge"><Check className="h-4 w-4" /></span>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-blue-600 dark:text-blue-400">Answer</p>
+              <div className="mt-1 text-base font-semibold text-neutral-900 dark:text-white">
+                <MdPreview value={(q.answers ?? []).join(", ") || "—"} minimal />
+              </div>
+            </div>
+          </div>
+          {q.explanation && (
+            <div className="mt-5 border-t border-blue-100 pt-5 dark:border-blue-900/30">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-neutral-400">Explanation</p>
+              <div className="text-sm leading-7 text-neutral-600 dark:text-neutral-400">
+                <MdPreview value={q.explanation} />
+              </div>
+            </div>
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
 }
 
 export default function Home() {
@@ -45,94 +137,270 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [loadingPaper, setLoadingPaper] = useState(false);
   const [error, setError] = useState("");
-  const [page, setPage] = useState(1);
-  const [query, setQuery] = useState("");
-  const [topic, setTopic] = useState("All topics");
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [sidebarPage, setSidebarPage] = useState(1);
   const [revealed, setRevealed] = useState<Set<number>>(new Set());
+  const [mobileListOpen, setMobileListOpen] = useState(false);
+  const [changePaperOpen, setChangePaperOpen] = useState(false);
 
   async function list(path = "") {
-    const response = await fetch(`${API}/${path}`, { headers: { Accept: "application/vnd.github+json" } });
-    if (!response.ok) throw new Error("The question archive could not be reached.");
-    return response.json() as Promise<Entry[]>;
+    const res = await fetch(`${API}/${path}`, { headers: { Accept: "application/vnd.github+json" } });
+    if (!res.ok) throw new Error();
+    return res.json() as Promise<Entry[]>;
   }
 
   useEffect(() => {
-    list().then(items => setYears(items.filter(item => item.type === "dir").sort((a, b) => b.name.localeCompare(a.name))))
-      .catch(() => setError("Couldn’t connect to the question archive. Please try again."))
+    list()
+      .then(items => setYears(items.filter(i => i.type === "dir").sort((a, b) => b.name.localeCompare(a.name))))
+      .catch(() => setError("Couldn't connect to the question archive."))
       .finally(() => setLoading(false));
   }, []);
 
-  async function chooseYear(nextYear: string) {
-    setYear(nextYear); setBranch(""); setPaper(""); setQuestions([]); setPapers([]); setLoading(true); setError("");
-    try { setBranches((await list(nextYear)).filter(item => item.type === "dir").sort((a, b) => a.name.localeCompare(b.name))); }
-    catch { setError("Couldn’t load branches for this year."); }
+  async function chooseYear(v: string) {
+    setYear(v); setBranch(""); setPaper(""); setQuestions([]); setPapers([]); setLoading(true); setError("");
+    try { setBranches((await list(v)).filter(i => i.type === "dir").sort((a, b) => a.name.localeCompare(b.name))); }
+    catch { setError("Couldn't load branches."); }
     finally { setLoading(false); }
   }
 
-  async function chooseBranch(nextBranch: string) {
-    setBranch(nextBranch); setPaper(""); setQuestions([]); setLoading(true); setError("");
-    try { setPapers((await list(`${year}/${nextBranch}`)).filter(item => item.type === "dir").sort((a, b) => a.name.localeCompare(b.name))); }
-    catch { setError("Couldn’t load papers for this branch."); }
+  async function chooseBranch(v: string) {
+    setBranch(v); setPaper(""); setQuestions([]); setLoading(true); setError("");
+    try { setPapers((await list(`${year}/${v}`)).filter(i => i.type === "dir").sort((a, b) => a.name.localeCompare(b.name))); }
+    catch { setError("Couldn't load papers."); }
     finally { setLoading(false); }
   }
 
-  async function choosePaper(nextPaper: string) {
-    setPaper(nextPaper); setLoadingPaper(true); setError(""); setPage(1); setQuery(""); setTopic("All topics"); setRevealed(new Set());
+  async function choosePaper(v: string) {
+    setPaper(v); setLoadingPaper(true); setError(""); setActiveIndex(0); setSidebarPage(1); setRevealed(new Set()); setChangePaperOpen(false);
     try {
-      const response = await fetch(`${RAW}/${year}/${branch}/${nextPaper}/final_questions.json`);
-      if (!response.ok) throw new Error();
-      const data = await response.json() as Question[];
-      setQuestions(data);
-    } catch { setError("This paper does not have a readable final_questions.json file yet."); setQuestions([]); }
+      const res = await fetch(`${RAW}/${year}/${branch}/${v}/final_questions.json`);
+      if (!res.ok) throw new Error();
+      setQuestions(await res.json() as Question[]);
+    } catch { setError("No questions found for this paper."); setQuestions([]); }
     finally { setLoadingPaper(false); }
   }
 
-  const topics = useMemo(() => ["All topics", ...Array.from(new Set(questions.map(q => q.topic_name).filter(Boolean) as string[])).sort()], [questions]);
-  const filtered = useMemo(() => questions.filter(q => {
-    const inTopic = topic === "All topics" || q.topic_name === topic;
-    const haystack = `${q.question} ${(q.choices ?? []).join(" ")} ${q.topic_name}`.toLowerCase();
-    return inTopic && haystack.includes(query.toLowerCase());
-  }), [questions, topic, query]);
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const shown = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  function reset() {
+    setYear(""); setBranch(""); setPaper(""); setQuestions([]); setBranches([]); setPapers([]);
+    setActiveIndex(0); setSidebarPage(1); setRevealed(new Set()); setError("");
+  }
 
-  useEffect(() => setPage(1), [query, topic]);
+  const totalPages = Math.max(1, Math.ceil(questions.length / SIDEBAR_PAGE));
+  const sidebarItems = questions.slice((sidebarPage - 1) * SIDEBAR_PAGE, sidebarPage * SIDEBAR_PAGE);
 
-  return <main>
-    <header className="topbar">
-      <a className="brand" href="#top" aria-label="GATE Question Bank home"><span className="brand-mark">G</span><span>GATE <b>Question Bank</b></span></a>
-      <span className="source"><i /> Live archive</span>
-    </header>
-    <section id="top" className="hero">
-      <div className="eyebrow">PRACTISE WITH PURPOSE</div>
-      <h1>Find the question.<br /><em>Build the instinct.</em></h1>
-      <p>Past GATE papers, thoughtfully organised. Select a paper and work through it at your own pace.</p>
-      <div className="steps"><span><b>1</b> Choose year</span><span><b>2</b> Pick branch</span><span><b>3</b> Start solving</span></div>
-    </section>
+  const activeQuestion = questions[activeIndex];
 
-    <section className="selector" aria-label="Question source selector">
-      <div className="select-field"><label htmlFor="year">EXAM YEAR</label><select id="year" value={year} onChange={e => chooseYear(e.target.value)} disabled={loading}><option value="">Select a year</option>{years.map(item => <option key={item.path} value={item.name}>{item.name}</option>)}</select></div>
-      <div className="select-field"><label htmlFor="branch">PAPER / BRANCH</label><select id="branch" value={branch} onChange={e => chooseBranch(e.target.value)} disabled={!year || loading}><option value="">{year ? "Select branch" : "Choose year first"}</option>{branches.map(item => <option key={item.path} value={item.name}>{readable(item.name)}</option>)}</select></div>
-      <div className="select-field"><label htmlFor="paper">QUESTION PAPER</label><select id="paper" value={paper} onChange={e => choosePaper(e.target.value)} disabled={!branch || loading}><option value="">{branch ? "Select paper" : "Choose branch first"}</option>{papers.map(item => <option key={item.path} value={item.name}>{item.name.toUpperCase()}</option>)}</select></div>
-    </section>
+  if (!questions.length && !loadingPaper) {
+    return (
+      <div className="flex min-h-[calc(100vh-57px)] items-center justify-center px-4">
+        <div className="w-full max-w-lg">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">GATE Question Bank</h1>
+            <p className="mt-2 text-sm text-neutral-500">Select a year and department to start practicing.</p>
+          </div>
 
-    {error && <div className="notice error">{error}</div>}
-    {loadingPaper && <section className="empty"><div className="spinner" /> Loading this paper from the archive…</section>}
-    {!loadingPaper && !questions.length && !error && <section className="empty"><div className="empty-icon">↗</div><h2>Your practice set is waiting</h2><p>The archive is only queried as you choose a paper. Nothing is downloaded before you need it.</p></section>}
+          {error && (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-400">
+              {error}
+            </div>
+          )}
 
-    {!!questions.length && !loadingPaper && <section className="reader">
-      <div className="reader-heading"><div><div className="eyebrow">{year} · {readable(branch)} · {paper.toUpperCase()}</div><h2>Question set</h2><p>{questions.length} questions available from the archive</p></div><div className="data-note"><span>↓</span> Loaded one paper only</div></div>
-      <div className="tools"><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search this paper" aria-label="Search this paper" /><select value={topic} onChange={e => setTopic(e.target.value)} aria-label="Filter by topic">{topics.map(name => <option key={name}>{name}</option>)}</select></div>
-      <p className="result-count">Showing {shown.length ? (page - 1) * PAGE_SIZE + 1 : 0}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length} questions</p>
-      <div className="questions">{shown.map((q, index) => {
-        const absoluteIndex = (page - 1) * PAGE_SIZE + index;
-        const answerOpen = revealed.has(absoluteIndex);
-        const images = (q.images ?? []).map(remoteImage).filter((image): image is string => Boolean(image));
-        return <article className="question" key={`${q.question_number}-${absoluteIndex}`}><div className="question-meta"><span className="number">{q.question_number ?? `Q.${absoluteIndex + 1}`}</span><span>{q.topic_name ?? "GATE"}</span><span>{q.marks ?? 1} mark{q.marks === 1 ? "" : "s"}{q.negativeMarks ? ` · −${q.negativeMarks}` : ""}</span></div><div className="question-body"><p className="prompt">{markdownText(q.question)}</p>{images.map((image, imageIndex) => <img className="question-image" key={imageIndex} src={image} alt={`Diagram for ${q.question_number}`} />)}<div className="choices">{(q.choices ?? []).map((choice, choiceIndex) => <div className="choice" key={choiceIndex}><span>{String.fromCharCode(65 + choiceIndex)}</span><p>{markdownText(choice)}</p></div>)}</div><button className="answer-button" onClick={() => setRevealed(old => { const next = new Set(old); answerOpen ? next.delete(absoluteIndex) : next.add(absoluteIndex); return next; })}>{answerOpen ? "Hide answer" : "Reveal answer"}<b>→</b></button>{answerOpen && <aside className="answer"><strong>Answer</strong><p>{(q.answers ?? []).join(", ") || "Not specified"}</p>{q.explanation && <details><summary>Read explanation</summary><p>{markdownText(q.explanation)}</p></details>}</aside>}</div></article>;
-      })}</div>
-      {!shown.length && <div className="no-results">No questions match those filters.</div>}
-      <nav className="pagination" aria-label="Question pages"><button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>← Previous</button><span>Page <b>{page}</b> of {pageCount}</span><button onClick={() => setPage(p => Math.min(pageCount, p + 1))} disabled={page === pageCount}>Next →</button></nav>
-    </section>}
-    <footer>Built for deliberate practice · Questions served from <a href={`https://github.com/${SOURCE}`} target="_blank" rel="noreferrer">the open GATE archive</a></footer>
-  </main>;
+          <div className="space-y-4 rounded-2xl border border-neutral-200/60 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900">
+            <Picker label="Year" value={year} placeholder={loading && !years.length ? "Loading…" : "Select year"} items={years} onSelect={chooseYear} />
+            <Picker label="Department" value={branch} placeholder={loading && year ? "Loading…" : "Select department"} items={branches} disabled={!year || loading} onSelect={chooseBranch} display={readable} />
+            <Picker label="Paper" value={paper} placeholder={loading && branch ? "Loading…" : "Select paper"} items={papers} disabled={!branch || loading} onSelect={choosePaper} display={v => v.toUpperCase()} />
+          </div>
+
+          {loadingPaper && (
+            <div className="mt-6 flex items-center justify-center gap-2 text-sm text-neutral-500">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading questions…
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (loadingPaper) {
+    return (
+      <div className="flex min-h-[calc(100vh-57px)] items-center justify-center">
+        <div className="flex items-center gap-2 text-sm text-neutral-500">
+          <Loader2 className="h-5 w-5 animate-spin text-blue-500" /> Loading questions…
+        </div>
+      </div>
+    );
+  }
+
+  function selectQuestion(globalIndex: number) {
+    setActiveIndex(globalIndex);
+    setMobileListOpen(false);
+  }
+
+  const questionListContent = (
+    <>
+      <div className="space-y-0.5">
+        {sidebarItems.map((q, i) => {
+          const globalIndex = (sidebarPage - 1) * SIDEBAR_PAGE + i;
+          const isActive = globalIndex === activeIndex;
+          const qNum = q.question_number ?? `Q${globalIndex + 1}`;
+          const preview = (q.question ?? "").replace(/[#*_`$\\]/g, "").slice(0, 80);
+          return (
+            <button
+              key={globalIndex}
+              onClick={() => selectQuestion(globalIndex)}
+              className={cn(
+                "flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
+                isActive
+                  ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300"
+                  : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+              )}
+            >
+              <span className={cn(
+                "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[11px] font-bold",
+                isActive
+                  ? "bg-blue-500 text-white"
+                  : "bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500"
+              )}>
+                {globalIndex + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium leading-4">
+                  {qNum}
+                  {q.type && <span className="ml-1.5 text-[10px] font-normal text-neutral-400">· {q.type}</span>}
+                </p>
+                <p className="mt-0.5 truncate text-[11px] text-neutral-400 dark:text-neutral-500">{preview || "No preview"}</p>
+              </div>
+              {q.marks && <span className="mt-0.5 shrink-0 text-[10px] font-semibold text-neutral-400">{q.marks}M</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-neutral-200/60 px-3 pt-3 dark:border-neutral-800">
+          <button
+            disabled={sidebarPage === 1}
+            onClick={() => setSidebarPage(p => p - 1)}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 disabled:opacity-30 dark:hover:bg-neutral-800"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="text-[11px] font-medium text-neutral-400">{sidebarPage} / {totalPages}</span>
+          <button
+            disabled={sidebarPage === totalPages}
+            onClick={() => setSidebarPage(p => p + 1)}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 disabled:opacity-30 dark:hover:bg-neutral-800"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+    </>
+  );
+
+  return (
+    <div className="flex h-[calc(100vh-57px)] flex-col relative">
+      {changePaperOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between border-b border-neutral-200/60 p-4 dark:border-neutral-800">
+              <h2 className="text-sm font-semibold text-neutral-900 dark:text-white">Change Paper</h2>
+              <button onClick={() => setChangePaperOpen(false)} className="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <Picker label="Year" value={year} placeholder={loading && !years.length ? "Loading…" : "Select year"} items={years} onSelect={chooseYear} />
+              <Picker label="Department" value={branch} placeholder={loading && year ? "Loading…" : "Select department"} items={branches} disabled={!year || loading} onSelect={chooseBranch} display={readable} />
+              <Picker label="Paper" value={paper} placeholder={loading && branch ? "Loading…" : "Select paper"} items={papers} disabled={!branch || loading} onSelect={choosePaper} display={v => v.toUpperCase()} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex shrink-0 items-center justify-between border-b border-neutral-200/60 bg-white px-4 py-2 dark:border-neutral-800 dark:bg-neutral-900 sm:px-5">
+        <div className="flex items-center gap-2 text-xs text-neutral-500">
+          <span className="font-semibold text-neutral-800 dark:text-neutral-200">{year}</span>
+          <span className="text-neutral-300 dark:text-neutral-600">/</span>
+          <span className="font-medium">{readable(branch)}</span>
+          <span className="text-neutral-300 dark:text-neutral-600">/</span>
+          <span className="font-medium">{paper.toUpperCase()}</span>
+          <span className="ml-1 text-neutral-400">· {questions.length} questions</span>
+        </div>
+        <button onClick={() => setChangePaperOpen(true)} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-300">
+          <RotateCcw className="h-3 w-3" /> Change paper
+        </button>
+      </div>
+
+      <div className="flex flex-1 overflow-hidden">
+
+        {mobileListOpen && (
+          <div className="fixed inset-0 z-40 bg-black/30 lg:hidden" onClick={() => setMobileListOpen(false)} />
+        )}
+
+        <aside className={cn(
+          "fixed inset-y-0 top-[calc(57px+37px)] left-0 z-50 w-[300px] flex flex-col overflow-hidden border-r border-neutral-200/60 bg-white transition-transform duration-200 dark:border-neutral-800 dark:bg-neutral-900",
+          "lg:static lg:inset-y-auto lg:z-auto lg:w-[280px] lg:shrink-0 lg:translate-x-0",
+          mobileListOpen ? "translate-x-0" : "-translate-x-full"
+        )}>
+          <div className="flex items-center justify-between px-4 py-3 lg:py-3">
+            <h2 className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400">Questions</h2>
+            <button onClick={() => setMobileListOpen(false)} className="flex h-6 w-6 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-100 lg:hidden dark:hover:bg-neutral-800">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-2 pb-3">
+            {questionListContent}
+          </div>
+        </aside>
+
+        <main className="flex-1 overflow-y-auto">
+          <div className="w-full px-4 py-5 sm:px-8 sm:py-8">
+            <button
+              onClick={() => setMobileListOpen(true)}
+              className="mb-4 flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-600 lg:hidden dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+            >
+              <PanelLeft className="h-4 w-4" />
+              Q{activeIndex + 1} of {questions.length}
+            </button>
+
+            {activeQuestion ? (
+              <div>
+                <div className="mb-4 flex items-center justify-between">
+                  <button
+                    disabled={activeIndex === 0}
+                    onClick={() => { const next = activeIndex - 1; setActiveIndex(next); setSidebarPage(Math.floor(next / SIDEBAR_PAGE) + 1); }}
+                    className="flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 disabled:opacity-30 dark:hover:bg-neutral-800"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" /> Prev
+                  </button>
+                  <span className="text-xs font-medium text-neutral-400">
+                    Question <span className="font-semibold text-neutral-700 dark:text-neutral-200">{activeIndex + 1}</span> of {questions.length}
+                  </span>
+                  <button
+                    disabled={activeIndex === questions.length - 1}
+                    onClick={() => { const next = activeIndex + 1; setActiveIndex(next); setSidebarPage(Math.floor(next / SIDEBAR_PAGE) + 1); }}
+                    className="flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 disabled:opacity-30 dark:hover:bg-neutral-800"
+                  >
+                    Next <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                <QuestionDetail
+                  q={activeQuestion}
+                  index={activeIndex + 1}
+                  answerOpen={revealed.has(activeIndex)}
+                  onToggleAnswer={() => {
+                    setRevealed(s => { const n = new Set(s); n.has(activeIndex) ? n.delete(activeIndex) : n.add(activeIndex); return n; });
+                  }}
+                />
+              </div>
+            ) : (
+              <p className="text-sm text-neutral-500">No question selected.</p>
+            )}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
 }
